@@ -1,7 +1,9 @@
 module Api
   module V1
     class ChallengesController < ApplicationController
-      before_action :set_challenge, only: [:show, :update, :destroy]
+      before_action :set_challenge, only: [:update, :destroy]
+      before_action :authenticate_user!, only: [:create ,:update, :destroy]
+      before_action :authorize_admin, only: [:create, :update, :destroy]
 
       # GET /api/v1/challenges
       def index
@@ -11,12 +13,17 @@ module Api
 
       # GET /api/v1/challenges/:id
       def show
-        render json: @challenge
+        challenge = Challenge.find_by(id: params[:id].to_i)
+        if challenge.nil?
+          render json: { error: 'Challenge not found' }, status: :not_found
+          return
+        end
+        render json: challenge
       end
 
       # POST /api/v1/challenges
       def create
-        @challenge = Challenge.new(challenge_params)
+        @challenge = current_user.challenges.new(challenge_params)
         if @challenge.save
           render json: @challenge, status: :created
         else
@@ -41,8 +48,14 @@ module Api
 
       private
 
+      def authorize_admin
+        unless current_user.email == ENV['ADMIN_EMAIL']
+          render json: { error: 'Unauthorized' }, status: :unauthorized
+        end
+      end
+
       def set_challenge
-        @challenge = Challenge.find(params[:id])
+        @challenge = current_user.challenges.find(params[:id])
       rescue ActiveRecord::RecordNotFound
         render json: { error: 'Challenge not found' }, status: :not_found
       end
